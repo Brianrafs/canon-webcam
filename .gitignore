@@ -1,0 +1,15 @@
+__pycache__/
+*.pyc
+*.png
+*.jpg
+sdktest/
+search_repos.py
+diag.py
+diag2.py
+diag3.py
+diag4.py
+diag5.py
+diag_props.py
+find_cam.py
+grab.py
+livecheck.py
