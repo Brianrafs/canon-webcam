@@ -1,0 +1,1 @@
+"""Testes do pacote canon_webcam."""

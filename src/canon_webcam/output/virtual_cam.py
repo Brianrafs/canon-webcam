@@ -1,7 +1,13 @@
+"""Saída via pyvirtualcam (OBS Virtual Camera)."""
+
+from __future__ import annotations
+
+from typing import Optional
+
 import cv2
 import numpy as np
-import time
-import threading
+
+from canon_webcam.output.base import VideoOutput
 
 try:
     import pyvirtualcam
@@ -10,8 +16,8 @@ except ImportError:
     HAS_PYVIRTUALCAM = False
 
 
-class VirtualWebcam:
-    def __init__(self, width=1280, height=720, fps=30):
+class VirtualWebcam(VideoOutput):
+    def __init__(self, width: int = 1280, height: int = 720, fps: int = 30):
         self._width = width
         self._height = height
         self._fps = fps
@@ -19,11 +25,11 @@ class VirtualWebcam:
         self._active = False
         self._backend = None
 
-    def start(self, device=None):
+    def start(self, device: Optional[str] = None) -> bool:
         if not HAS_PYVIRTUALCAM:
             raise RuntimeError(
-                "pyvirtualcam not installed. Install with: pip install pyvirtualcam\n"
-                "You also need OBS Virtual Camera or similar virtual camera driver."
+                "pyvirtualcam não instalado. Instale com: pip install pyvirtualcam\n"
+                "Também é necessário o OBS Virtual Camera ou driver similar."
             )
 
         try:
@@ -42,7 +48,7 @@ class VirtualWebcam:
             self._active = False
             return False
 
-    def send_frame(self, frame):
+    def send(self, frame: np.ndarray) -> bool:
         if not self._active or self._cam is None:
             return False
 
@@ -66,7 +72,7 @@ class VirtualWebcam:
             print(f"[VirtualCam] Send error: {e}")
             return False
 
-    def stop(self):
+    def stop(self) -> None:
         if self._cam is not None:
             try:
                 self._cam.close()
@@ -77,15 +83,15 @@ class VirtualWebcam:
         print("[VirtualCam] Stopped")
 
     @property
-    def is_active(self):
+    def is_active(self) -> bool:
         return self._active
 
     @property
-    def backend_name(self):
+    def backend_name(self) -> str:
         return self._backend or "None"
 
-    @staticmethod
-    def available():
+    @classmethod
+    def available(cls) -> bool:
         return HAS_PYVIRTUALCAM
 
     @staticmethod

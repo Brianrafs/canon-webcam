@@ -1,20 +1,25 @@
-import sys
-import cv2
-import numpy as np
-import time
+"""Interface de linha de comando para processamento de webcam/arquivo."""
 
-from processor import HUDRemover
+from __future__ import annotations
+
+import argparse
+import os
+import time
+from typing import Union
+
+import cv2
+
+from canon_webcam.output.virtual_cam import VirtualWebcam
+from canon_webcam.processing.hud_remover import HUDRemover
 
 
 class StandaloneProcessor:
-    """Process video files or camera feed without Canon EDSDK.
-    Useful for testing HUD removal with any video source.
-    """
+    """Processa arquivos de vídeo ou o feed da webcam sem EDSDK/GUI."""
 
     def __init__(self):
         self.hud_remover = HUDRemover()
 
-    def process_webcam(self, source=0, output_virtual=False):
+    def process_webcam(self, source: Union[int, str], output_virtual: bool = False) -> None:
         cap = cv2.VideoCapture(source)
         if not cap.isOpened():
             print(f"Error: Cannot open video source {source}")
@@ -28,15 +33,14 @@ class StandaloneProcessor:
         print("Press 'c' to toggle crop")
         print("Press 'a' to auto-detect HUD")
 
-        hud_blur = True
         self.hud_remover.set_blur_hud(True)
+        hud_blur = True
 
         vcam = None
         if output_virtual:
             try:
-                import pyvirtualcam
-                vcam = pyvirtualcam.Camera(width=1280, height=720, fps=30)
-                print(f"Virtual camera: {vcam.device}")
+                vcam = VirtualWebcam(width=1280, height=720, fps=30)
+                vcam.start()
             except Exception as e:
                 print(f"Virtual camera not available: {e}")
 
@@ -50,18 +54,15 @@ class StandaloneProcessor:
 
             processed = self.hud_remover.process_frame(frame)
 
-            if vcam:
-                rgb = cv2.cvtColor(processed, cv2.COLOR_BGR2RGB)
-                vcam.send(rgb)
-                vcam.sleep_until_next_frame()
+            if vcam and vcam.is_active:
+                vcam.send(processed)
 
             cv2.imshow("Preview (q=quit, h=hud, c=crop, a=auto)", processed)
 
             frame_count += 1
             elapsed = time.time() - start_time
             if elapsed >= 1.0:
-                fps = frame_count / elapsed
-                print(f"\rFPS: {fps:.1f}", end="", flush=True)
+                print(f"\rFPS: {frame_count / elapsed:.1f}", end="", flush=True)
                 frame_count = 0
                 start_time = time.time()
 
@@ -75,16 +76,16 @@ class StandaloneProcessor:
             elif key == ord('a'):
                 regions = self.hud_remover.detect_hud_text_regions(frame)
                 self.hud_remover.clear_hud_regions()
-                for r in regions:
-                    self.hud_remover.add_hud_region(*r)
+                for region in regions:
+                    self.hud_remover.add_hud_region(*region)
                 print(f"\nDetected {len(regions)} HUD regions")
 
         cap.release()
         cv2.destroyAllWindows()
         if vcam:
-            vcam.close()
+            vcam.stop()
 
-    def process_file(self, input_path, output_path=None):
+    def process_file(self, input_path: str, output_path: str = "") -> None:
         cap = cv2.VideoCapture(input_path)
         if not cap.isOpened():
             print(f"Error: Cannot open {input_path}")
@@ -124,20 +125,23 @@ class StandaloneProcessor:
         print("Done!")
 
 
-def main():
-    import argparse
+def _parse_args(argv=None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Canon T5i Webcam - Standalone HUD Processor")
     parser.add_argument("--source", type=str, default="0", help="Video source (0 for webcam, or file path)")
     parser.add_argument("--output", type=str, help="Output video file path")
     parser.add_argument("--virtual", action="store_true", help="Also output to virtual webcam")
-    args = parser.parse_args()
+    return parser.parse_args(argv)
 
-    processor = StandaloneProcessor()
+
+def main(argv=None) -> None:
+    args = _parse_args(argv)
 
     try:
-        source = int(args.source)
+        source: Union[int, str] = int(args.source)
     except ValueError:
         source = args.source
+
+    processor = StandaloneProcessor()
 
     if isinstance(source, str) and os.path.exists(source):
         processor.process_file(source, args.output)
@@ -146,5 +150,4 @@ def main():
 
 
 if __name__ == "__main__":
-    import os
     main()
